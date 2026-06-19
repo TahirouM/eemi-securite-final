@@ -7,3 +7,6 @@ coverage/
 
 # Branche secure : le .env n'est JAMAIS suivi par git (correction VULN-06).
 .env
+
+# Fichier d'instructions interne (non versionné)
+CLAUDE.md
