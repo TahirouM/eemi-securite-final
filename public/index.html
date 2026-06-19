@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini back-office — démo sécurité</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🛒 Mini back-office commandes</h1>
+    <div id="auth-status">Non connecté</div>
+  </header>
+
+  <main>
+    <section id="login-section">
+      <h2>Connexion</h2>
+      <input id="login-email" placeholder="email" value="user1@test.local" />
+      <input id="login-password" type="password" placeholder="mot de passe" value="User123!" />
+      <button id="login-btn">Se connecter</button>
+      <p id="login-msg"></p>
+    </section>
+
+    <section id="products-section">
+      <h2>Produits</h2>
+      <input id="search-input" placeholder="rechercher..." />
+      <button id="search-btn">Rechercher</button>
+      <ul id="products-list"></ul>
+    </section>
+
+    <section id="product-detail" hidden>
+      <h2 id="product-title"></h2>
+      <h3>Avis</h3>
+      <!-- Les commentaires sont rendus via innerHTML : VULN-03 démontrable ici -->
+      <div id="comments"></div>
+      <textarea id="comment-body" placeholder="Votre avis..."></textarea>
+      <button id="comment-btn">Publier</button>
+    </section>
+
+    <section id="orders-section">
+      <h2>Mes commandes</h2>
+      <button id="orders-btn">Charger</button>
+      <ul id="orders-list"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
