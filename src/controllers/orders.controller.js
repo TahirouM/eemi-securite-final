@@ -17,13 +17,18 @@ async function listMine(req, res, next) {
 }
 
 // GET /api/orders/:id
-// VULN-01 : IDOR / BOLA.
-// On récupère la commande par son ID SANS vérifier qu'elle appartient
-// à l'utilisateur authentifié -> n'importe qui lit la commande de n'importe qui.
+// Correction VULN-01 : contrôle d'appartenance.
+// Un utilisateur ne peut lire que SES commandes (where userId).
+// Un admin (rôle vérifié explicitement) peut lire n'importe laquelle.
 async function getOne(req, res, next) {
   try {
-    const order = await Order.findByPk(req.params.id); // <-- pas de contrôle d'ownership
+    const where = { id: req.params.id };
+    if (req.user.role !== 'admin') {
+      where.userId = req.user.id;
+    }
+    const order = await Order.findOne({ where });
     if (!order) {
+      // 404 indifférencié : ne révèle pas l'existence d'une commande d'autrui.
       return res.status(404).json({ error: 'Commande introuvable' });
     }
     return res.json(order);
