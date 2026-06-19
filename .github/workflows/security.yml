@@ -1,0 +1,83 @@
+name: security
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # 1) Build + tests fonctionnels et de sécurité
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  # 2) SAST — Semgrep (OWASP Top 10 + règles JS). Bloquant sur findings.
+  sast:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - run: semgrep ci --config p/owasp-top-ten --config p/javascript --error
+        env:
+          SEMGREP_RULES: "p/owasp-top-ten p/javascript"
+
+  # 3) SCA — audit des dépendances. Bloquant à partir du niveau "high".
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # Audit des dépendances de PRODUCTION, bloquant à partir de "high".
+      # (Les advisories restantes concernent la chaîne de build de sqlite3,
+      #  non exécutée au runtime ; voir SECURITY_AUDIT.md §9 Limites.)
+      - run: npm audit --omit=dev --audit-level=high
+
+  # 4) Secret scanning — Gitleaks. Bloquant si un secret est détecté.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 5) DAST — OWASP ZAP baseline contre l'app lancée en CI.
+  dast:
+    runs-on: ubuntu-latest
+    needs: build-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Préparer l'environnement (.env avec secret fort)
+        run: |
+          echo "PORT=3000" > .env
+          echo "NODE_ENV=development" >> .env
+          echo "JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" >> .env
+      - run: npm run seed
+      - name: Démarrer le serveur
+        run: |
+          npm start &
+          npx wait-on http://localhost:3000 --timeout 60000
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          # Informatif : ne bloque pas le job sur les alertes ZAP (rapport en artefact).
+          cmd_options: '-a'
+          fail_action: false

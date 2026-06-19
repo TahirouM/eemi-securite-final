@@ -1,0 +1,5 @@
+# Sur la branche `secure`, aucun secret réel n'est committé (le .env est
+# retiré du dépôt). Ce fichier est fourni à titre de sécurité.
+#
+# Les secrets de démonstration de la branche `vulnerable` sont factices et
+# marqués DEMO_ONLY ; ils ne doivent jamais être considérés comme réels.
