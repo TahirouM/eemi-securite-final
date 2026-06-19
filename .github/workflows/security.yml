@@ -76,7 +76,7 @@ jobs:
           npm start &
           npx wait-on http://localhost:3000 --timeout 60000
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:3000'
           # Informatif : ne bloque pas le job sur les alertes ZAP (rapport en artefact).
