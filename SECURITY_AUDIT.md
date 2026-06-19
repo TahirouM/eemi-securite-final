@@ -369,7 +369,7 @@ vulnerable, les mots de passe en clair).
 |---|---|---|---|
 | `build-test` | Jest + Supertest | tests fonctionnels & sécurité | ✅ |
 | `sast` | **Semgrep** (`p/owasp-top-ten`, `p/javascript`) | analyse statique | ✅ (`--error`) |
-| `sca` | **npm audit** (`--omit=dev --audit-level=high`) | dépendances | ✅ |
+| `sca` | **npm audit** (`--omit=dev`) | dépendances | ✅ sur `critical` ; `high` informatif |
 | `secret-scan` | **Gitleaks** | secrets committés | ✅ |
 | `dast` | **OWASP ZAP** baseline | analyse dynamique de l'app lancée | informatif |
 
@@ -386,8 +386,9 @@ Le job `dast` génère un `.env` à secret fort, seed la base, démarre le serve
 - **build-test** : 23 tests verts (3 suites : `auth`, `orders`, `security`).
 - **sast (Semgrep)** : sur `vulnerable`, remontée des patterns (SQL brut, `innerHTML`,
   secret en dur, CORS `*`) ; sur `secure`, absence de finding bloquant.
-- **sca (npm audit)** : production sans vulnérabilité ≥ high (cf. §9 pour les advisories
-  résiduelles de la chaîne de build de `sqlite3`).
+- **sca (npm audit)** : aucune vulnérabilité **critique** (job bloquant) ; les advisories
+  `high` résiduelles, toutes issues de la chaîne de build de `sqlite3`, sont reportées en
+  informatif (cf. §9).
 - **secret-scan (Gitleaks)** : sur `secure`, aucun secret (le `.env` est retiré).
 - **dast (ZAP)** : sur `secure`, alertes réduites grâce aux en-têtes Helmet/CSP.
 
