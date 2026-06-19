@@ -5,6 +5,5 @@ database.sqlite
 coverage/
 .DS_Store
 
-# NOTE (branche vulnerable) : le fichier .env est VOLONTAIREMENT committé
-# avec des secrets FACTICES marqués DEMO_ONLY pour démontrer VULN-06
-# (exposition de secrets). Sur la branche `secure`, .env est retiré du suivi.
+# Branche secure : le .env n'est JAMAIS suivi par git (correction VULN-06).
+.env

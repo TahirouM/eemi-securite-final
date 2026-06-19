@@ -5,6 +5,7 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const { errorHandler } = require('./middleware/error');
 const authRoutes = require('./routes/auth.routes');
@@ -17,11 +18,26 @@ const app = express();
 
 app.use(express.json());
 
-// VULN-06 : CORS totalement ouvert AVEC credentials.
-// origin '*' + credentials est une mauvaise configuration classique.
-app.use(cors({ origin: '*', credentials: true }));
+// Correction VULN-06 : Helmet pose les en-têtes de sécurité (HSTS, X-Frame-Options,
+// X-Content-Type-Options…) et une Content-Security-Policy stricte.
+// La CSP (default-src 'self', pas de inline) renforce la défense contre VULN-03 (XSS).
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  })
+);
 
-// VULN-06 : AUCUN header de sécurité (pas de Helmet, pas de CSP).
+// Correction VULN-06 : CORS restreint à l'origine attendue, sans wildcard.
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 
 // API
 app.use('/api/auth', authRoutes);
@@ -30,14 +46,13 @@ app.use('/api/products', productsRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Front minimal
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Correction VULN-06 : on ne sert QUE le dossier public (jamais la racine),
+// et les dotfiles (ex. .env) sont refusés.
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), { dotfiles: 'deny' })
+);
 
-// VULN-06 : service statique de la RACINE du projet, dotfiles autorisés.
-// -> GET /.env renvoie le fichier de secrets, GET /src/... expose le code source.
-app.use(express.static(path.join(__dirname, '..'), { dotfiles: 'allow' }));
-
-// Handler d'erreurs en dernier (renvoie la stack — VULN-06).
+// Handler d'erreurs générique en dernier (pas de stack en réponse — VULN-06).
 app.use(errorHandler);
 
 module.exports = app;
