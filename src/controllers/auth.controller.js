@@ -1,11 +1,12 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { User } = require('../models');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, JWT_EXPIRES_IN } = require('../middleware/auth');
 
 // POST /api/auth/register
-// Inscription simple. Mot de passe stocké EN CLAIR (VULN-04).
+// Correction VULN-04 : le mot de passe est haché avec bcrypt avant stockage.
 async function register(req, res, next) {
   try {
     const { name, email, password } = req.body;
@@ -14,13 +15,15 @@ async function register(req, res, next) {
     }
     const existing = await User.findOne({ where: { email } });
     if (existing) {
-      return res.status(409).json({ error: 'Email déjà utilisé' });
+      // Message volontairement neutre pour limiter l'énumération.
+      return res.status(409).json({ error: 'Inscription impossible' });
     }
+    const passwordHash = await bcrypt.hash(password, 10);
     const user = await User.create({
       name: name || email,
       email,
-      password, // EN CLAIR (vulnerable)
-      role: 'user',
+      password: passwordHash,
+      role: 'user', // le rôle n'est jamais pris depuis l'entrée utilisateur
     });
     return res.status(201).json({ id: user.id, email: user.email });
   } catch (err) {
@@ -29,30 +32,33 @@ async function register(req, res, next) {
 }
 
 // POST /api/auth/login
-// VULN-04 (cumul de symptômes) :
-//  - comparaison de mot de passe EN CLAIR (pas de bcrypt),
-//  - messages d'erreur PRÉCIS -> énumération de comptes,
-//  - JWT signé avec un secret faible et SANS expiration,
-//  - pas de rate limiting (voir app.js).
+// Corrections VULN-04 :
+//  - vérification du mot de passe via bcrypt.compare,
+//  - message d'erreur GÉNÉRIQUE (anti-énumération),
+//  - JWT signé avec un secret fort (env) et expiration,
+//  - rate limiting appliqué au niveau de la route (voir app.js).
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ where: { email } });
+    const GENERIC = { error: 'Identifiants invalides' };
+
     if (!user) {
-      // Message précis : révèle que l'email n'existe pas (énumération).
-      return res.status(401).json({ error: 'Utilisateur inconnu' });
+      // Comparaison factice pour égaliser le temps de réponse (timing).
+      await bcrypt.compare(password || '', '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinv');
+      return res.status(401).json(GENERIC);
     }
 
-    if (user.password !== password) {
-      // Message précis : confirme que l'email existe mais le mot de passe est faux.
-      return res.status(401).json({ error: 'Mot de passe incorrect' });
+    const ok = await bcrypt.compare(password || '', user.password);
+    if (!ok) {
+      return res.status(401).json(GENERIC);
     }
 
-    // Token SANS expiration, secret faible.
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     return res.json({ token, role: user.role, email: user.email });

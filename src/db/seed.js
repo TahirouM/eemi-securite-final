@@ -2,10 +2,13 @@
 
 // Seed des données de démonstration.
 //
-// Branche vulnerable : les mots de passe sont stockés EN CLAIR (volontaire, VULN-04).
+// Branche secure : les mots de passe sont HACHÉS avec bcrypt (correction VULN-04).
 // Les commandes #101 (user1) et #102 (user2) servent à la démo IDOR (VULN-01).
 
+const bcrypt = require('bcryptjs');
 const { sequelize, User, Product, Order, Comment } = require('../models');
+
+const hash = (pwd) => bcrypt.hashSync(pwd, 10);
 
 async function seed() {
   // Recrée le schéma à chaque seed pour partir d'un état propre.
@@ -15,21 +18,21 @@ async function seed() {
   const admin = await User.create({
     name: 'Admin',
     email: 'admin@test.local',
-    password: 'Admin123!', // EN CLAIR (vulnerable)
+    password: hash('Admin123!'),
     role: 'admin',
   });
 
   const user1 = await User.create({
     name: 'User One',
     email: 'user1@test.local',
-    password: 'User123!',
+    password: hash('User123!'),
     role: 'user',
   });
 
   const user2 = await User.create({
     name: 'User Two',
     email: 'user2@test.local',
-    password: 'User123!',
+    password: hash('User123!'),
     role: 'user',
   });
 
@@ -90,11 +93,15 @@ async function seed() {
     body: 'La réduction de bruit est bluffante.',
   });
 
-  console.log('✅ Seed terminé.');
-  console.log('   Comptes :');
-  console.log('   - admin@test.local / Admin123! (admin)');
-  console.log('   - user1@test.local / User123!  (commande #101, #103)');
-  console.log('   - user2@test.local / User123!  (commande #102)');
+  // N'affiche le récapitulatif que lors d'une exécution directe (npm run seed),
+  // pas pendant les tests Jest.
+  if (require.main === module) {
+    console.log('✅ Seed terminé.');
+    console.log('   Comptes :');
+    console.log('   - admin@test.local / Admin123! (admin)');
+    console.log('   - user1@test.local / User123!  (commande #101, #103)');
+    console.log('   - user2@test.local / User123!  (commande #102)');
+  }
 }
 
 // Exécution directe en CLI : `npm run seed`
