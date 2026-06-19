@@ -1,7 +1,8 @@
 'use strict';
 
-const { sequelize, Product, Comment } = require('../models');
-const { QueryTypes } = require('sequelize');
+const sanitizeHtml = require('sanitize-html');
+const { Op } = require('sequelize');
+const { Product, Comment } = require('../models');
 
 // GET /api/products
 async function list(req, res, next) {
@@ -14,18 +15,16 @@ async function list(req, res, next) {
 }
 
 // GET /api/products/search?q=...
-// VULN-02 : INJECTION SQL.
-// La valeur de `q` est CONCATÉNÉE directement dans la requête SQL brute.
-// Exemple d'exploitation (lecture seule) : q=' OR '1'='1
+// Correction VULN-02 : recherche via l'ORM avec Op.like (requête paramétrée,
+// binds gérés par Sequelize) + validation/longueur de `q`. Plus de SQL brut.
 async function search(req, res, next) {
   try {
-    const q = req.query.q || '';
-    // Requête brute vulnérable — concaténation de chaîne non échappée.
-    const rows = await sequelize.query(
-      `SELECT * FROM products WHERE name LIKE '%${q}%'`,
-      { type: QueryTypes.SELECT }
-    );
-    return res.json(rows);
+    const q = (req.query.q || '').toString().slice(0, 100);
+    const products = await Product.findAll({
+      where: { name: { [Op.like]: `%${q}%` } },
+      order: [['id', 'ASC']],
+    });
+    return res.json(products);
   } catch (err) {
     return next(err);
   }
@@ -58,20 +57,21 @@ async function listComments(req, res, next) {
 }
 
 // POST /api/products/:id/comments
-// VULN-03 : XSS STOCKÉE.
-// Le corps du commentaire est stocké TEL QUEL, sans aucune sanitization.
-// Combiné au rendu front via innerHTML, tout payload HTML/JS s'exécute.
+// Correction VULN-03 : le contenu est NETTOYÉ côté serveur à l'écriture
+// (sanitize-html, défense en profondeur) et le front rend via textContent + CSP.
 async function addComment(req, res, next) {
   try {
-    const { body } = req.body;
-    if (!body) {
+    const raw = (req.body.body || '').toString();
+    if (!raw.trim()) {
       return res.status(400).json({ error: 'body requis' });
     }
+    // allowedTags: [] -> supprime tout HTML, ne conserve que le texte.
+    const clean = sanitizeHtml(raw, { allowedTags: [], allowedAttributes: {} });
     const comment = await Comment.create({
       productId: req.params.id,
       userId: req.user.id,
       author: req.user.email,
-      body, // <-- stocké sans nettoyage (vulnerable)
+      body: clean,
     });
     return res.status(201).json(comment);
   } catch (err) {
