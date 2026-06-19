@@ -2,11 +2,13 @@
 
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, requireRole } = require('../middleware/auth');
 const ctrl = require('../controllers/admin.controller');
 
-// VULN-07 : `auth` seul, AUCUN contrôle de rôle admin.
-router.get('/users', auth, ctrl.listUsers);
-router.get('/orders', auth, ctrl.listOrders);
+// Correction VULN-07 : auth + contrôle de rôle admin sur TOUTES les routes /api/admin/*.
+router.use(auth, requireRole('admin'));
+
+router.get('/users', ctrl.listUsers);
+router.get('/orders', ctrl.listOrders);
 
 module.exports = router;
