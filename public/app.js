@@ -1,7 +1,9 @@
 'use strict';
 
-// VULN-08 : le JWT est stocké dans localStorage -> accessible au JavaScript,
-// donc volable par une XSS (VULN-03). On chaîne les deux dans la démo.
+// VULN-08 (atténuation) : le JWT reste en localStorage pour simplifier la démo,
+// MAIS la XSS (VULN-03) est corrigée (sanitization serveur + rendu textContent
+// + CSP), donc le vol de token par script injecté n'est plus possible.
+// En production réelle, privilégier un cookie httpOnly + SameSite.
 function getToken() {
   return localStorage.getItem('token');
 }
@@ -69,10 +71,19 @@ async function openProduct(p) {
 async function loadComments(productId) {
   const comments = await api('/api/products/' + productId + '/comments');
   const container = document.getElementById('comments');
-  // VULN-03 : rendu via innerHTML -> exécution de tout HTML/JS injecté.
-  container.innerHTML = (comments || [])
-    .map((c) => `<div class="comment"><b>${c.author}</b><br>${c.body}</div>`)
-    .join('');
+  // Correction VULN-03 : rendu via textContent -> aucun HTML interprété.
+  container.innerHTML = '';
+  (comments || []).forEach((c) => {
+    const div = document.createElement('div');
+    div.className = 'comment';
+    const b = document.createElement('b');
+    b.textContent = c.author;
+    const body = document.createElement('div');
+    body.textContent = c.body;
+    div.appendChild(b);
+    div.appendChild(body);
+    container.appendChild(div);
+  });
 }
 
 document.getElementById('comment-btn').addEventListener('click', async () => {
